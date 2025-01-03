@@ -1,0 +1,1148 @@
+using Microsoft.Win32;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Net.Http;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Newtonsoft.Json;
+using System.IO;
+using HtmlAgilityPack;
+using RobloxInjectorDLL;
+using Siticone.UI.WinForms;
+using Syphra;
+using System.Diagnostics;
+using System.Net;
+using ICSharpCode.SharpZipLib.Zip;
+using System.Reflection;
+using System.Linq;
+using Microsoft.Web.WebView2.WinForms;
+
+namespace GRploits
+{
+    public partial class Form2 : Form
+    {
+
+        private void LoadKeyFile()
+        {
+            {
+                // Get the path of the debug directory and append the file name
+                string filePath = Path.Combine(Application.StartupPath, "key.txt");
+
+                // Check if the file exists
+                if (File.Exists(filePath))
+                {
+                    // Read all text from the file
+                    string fileContent = File.ReadAllText(filePath);
+
+                    // Set the content to the RichTextBox
+                    richTextBox4.Text = fileContent;
+                }
+            }
+        }
+
+        private List<Script> allScripts = new List<Script>();
+        private bool isPopulating = false; // Track if scripts are being fetched
+        private const int CornerRadius = 10;
+        private string filePath; // Class-level variable
+
+        public const int WM_NCLBUTTONDOWN = 0xA1;
+        public const int HT_CAPTION = 0x2;
+        private const string githubRawUrl = "https://raw.githubusercontent.com/hiddenuser3066/keysystems/main/version_latest.txt";
+        string downloadUrl = "https://getsyphra.uk/syphra.zip";
+        string tempZipPath = Path.Combine(Path.GetTempPath(), "syphra_update.zip");
+        string extractFolderPath = Path.Combine(Path.GetTempPath(), "syphra_update");
+        private const string currentVersion = "1.0.7"; // Replace with your current version
+        private bool hasUserResponded = false;
+
+
+        public Form2()
+        {
+            InitializeComponent();
+            // Set the file path to the current directory (where the EXE is located)
+            filePath = Path.Combine(Application.StartupPath, "updates.txt");
+            this.webView211 = new WebView2(); // Ensure your WebView2 control is initialized
+            this.Controls.Add(webView211);
+        }
+
+        private void addIntel(string label, string kind, string detail, string insertText)
+        {
+            string text = "\"" + label + "\"";
+            string text2 = "\"" + kind + "\"";
+            string text3 = "\"" + detail + "\"";
+            string text4 = "\"" + insertText + "\"";
+
+            // Execute JavaScript to call the AddIntellisense function
+            webView21.CoreWebView2.ExecuteScriptAsync($"AddIntellisense({text}, {text2}, {text3}, {text4})");
+        }
+
+        private void addGlobalF()
+        {
+            string[] array = File.ReadAllLines(this.defPath + "//globalf.txt");
+            foreach (string text in array)
+            {
+                bool flag = text.Contains(':');
+                if (flag)
+                {
+                    this.addIntel(text, "Function", text, text.Substring(1));
+                }
+                else
+                {
+                    this.addIntel(text, "Function", text, text);
+                }
+            }
+        }
+
+        private void addGlobalV()
+        {
+            foreach (string text in File.ReadLines(this.defPath + "//globalv.txt"))
+            {
+                this.addIntel(text, "Variable", text, text);
+            }
+        }
+
+        private void addGlobalNS()
+        {
+            foreach (string text in File.ReadLines(this.defPath + "//globalns.txt"))
+            {
+                this.addIntel(text, "Class", text, text);
+            }
+        }
+
+        private void addMath()
+        {
+            foreach (string text in File.ReadLines(this.defPath + "//classfunc.txt"))
+            {
+                this.addIntel(text, "Method", text, text);
+            }
+        }
+
+        private void addBase()
+        {
+            foreach (string text in File.ReadLines(this.defPath + "//base.txt"))
+            {
+                this.addIntel(text, "Keyword", text, text);
+            }
+        }
+
+        private async void SearchScripts(string query)
+        {
+            isPopulating = true; // Indicate we're filtering the list for searching
+
+            await FetchScripts(query);
+
+            isPopulating = false; // Finished filtering
+        }
+
+        private GraphicsPath GetRoundedRectPath(Rectangle rect, int radius)
+        {
+            int diameter = radius * 2;
+            GraphicsPath path = new GraphicsPath();
+            path.AddArc(rect.X, rect.Y, diameter, diameter, 180, 90);
+            path.AddLine(rect.X + radius, rect.Y, rect.Right - radius, rect.Y);
+            path.AddArc(rect.Right - diameter, rect.Y, diameter, diameter, 270, 90);
+            path.AddLine(rect.Right, rect.Y + radius, rect.Right, rect.Bottom - radius);
+            path.AddArc(rect.Right - diameter, rect.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddLine(rect.Right - radius, rect.Bottom, rect.X + radius, rect.Bottom);
+            path.AddArc(rect.X, rect.Bottom - diameter, diameter, diameter, 90, 90);
+            path.AddLine(rect.X, rect.Bottom - radius, rect.X, rect.Y + radius);
+            path.CloseFigure();
+            return path;
+        }
+
+        private async Task FetchScripts(string query)
+        {
+            string ApiUrl = $"https://scriptblox.com/api/script/search?q=%20{query}";
+
+            using (HttpClient client = new HttpClient())
+            {
+                try
+                {
+                    isPopulating = true; // Indicate we're fetching scripts
+                    var response = await client.GetStringAsync(ApiUrl);
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse>(response); // Deserialize into ApiResponse
+                    allScripts = apiResponse.Result.Scripts; // Get the list of scripts
+                    listBoxScripts.DataSource = allScripts; // Bind to ListBox
+                    listBoxScripts.DisplayMember = "Title"; // Display script titles
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error fetching scripts: {ex.Message}");
+                }
+                finally
+                {
+                    isPopulating = false; // Finished fetching scripts
+                }
+            }
+        }
+
+        private async Task<List<Script>> FetchScripts(int pageNumber = 1)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                try
+                {
+                    isPopulating = true; // Indicate we're fetching scripts
+                    // Update the API URL to include the page number
+                    string apiUrl = $"https://scriptblox.com/api/script/search?q=%20&page={pageNumber}";
+                    var response = await client.GetStringAsync(apiUrl);
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse>(response); // Deserialize into ApiResponse
+                    allScripts = apiResponse.Result.Scripts; // Get the list of scripts
+                    listBoxScripts.DataSource = allScripts; // Bind to ListBox
+                    listBoxScripts.DisplayMember = "Title"; // Display script titles
+
+                    return allScripts; // Return the list of scripts
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error fetching scripts: {ex.Message}");
+                    return new List<Script>(); // Return an empty list in case of an error
+                }
+                finally
+                {
+                    isPopulating = false; // Finished fetching scripts
+                }
+            }
+        }
+
+        private async Task LoadDataAsync()
+        {
+            // Perform a time-consuming operation in the background
+            await Task.Run(() =>
+            {
+                // Simulate a long-running task (e.g., loading data, connecting to a database)
+                System.Threading.Thread.Sleep(0); // Replace this with actual logic
+            });
+
+            // Update UI with the results of the background work
+            // Ensure any UI changes are made on the main thread
+            this.Invoke((Action)(() =>
+            {
+                // Update UI elements here, e.g., populate a list, display data
+            }));
+        }
+        private async Task CheckVersionOnceAsync()
+        {
+            try
+            {
+                using (HttpClient client = new HttpClient())
+                {
+                    // Fetch the latest version from the GitHub raw file
+                    string latestVersion = await client.GetStringAsync(githubRawUrl);
+                    latestVersion = latestVersion.Trim(); // Remove extra spaces or newlines
+
+                    // Update the label
+                    if (IsNewerVersion(latestVersion, currentVersion) && !hasUserResponded)
+                    {
+                        // Outdated: Update label and show message box
+                        label17.Text = $"{currentVersion} (Outdated)";
+                        label17.ForeColor = System.Drawing.Color.Red;
+
+                        // Show message box for update only once
+                        DialogResult result = MessageBox.Show(
+                            $"A newer version ({latestVersion}) is available. Do you want to update?",
+                            "Update Available",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Information);
+
+                        if (result == DialogResult.Yes)
+                        {
+                            // User chose to update
+                            hasUserResponded = true;  // Mark that the user has responded
+                                                      // Proceed with update process (you can call PerformUpdateAsync here if needed)
+                            await PerformUpdateAsync(latestVersion);
+                        }
+                        else
+                        {
+                            // User chose "No"
+                            hasUserResponded = true;  // Mark that the user has responded
+                                                      // Do nothing, just stop asking
+                        }
+                    }
+                    else
+                    {
+                        // Latest: Update label
+                        label17.Text = $"{currentVersion} (Latest)";
+                        label17.ForeColor = System.Drawing.Color.Green;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle errors during version check
+                label17.Text = "Error checking version";
+                label17.ForeColor = System.Drawing.Color.Gray;
+                Console.WriteLine($"Error: {ex.Message}");
+            }
+        }
+        private bool IsNewerVersion(string latestVersion, string currentVersion)
+        {
+            try
+            {
+                Version latest = new Version(latestVersion);
+                Version current = new Version(currentVersion);
+
+                // Return true if the latest version is greater than the current version
+                return latest > current;
+            }
+            catch
+            {
+                // If parsing fails, assume the version is not newer
+                return false;
+            }
+        }
+
+        private async Task PerformUpdateAsync(string latestVersion)
+        {
+            try
+            {
+                // Define the URL of the zip file and the download destination path
+                string tempZipPath = Path.Combine(Path.GetTempPath(), "syphra_update.zip");
+                string extractFolderPath = Path.Combine(Path.GetTempPath(), "syphra_update");
+
+                // 1. Download the zip file
+                using (HttpClient client = new HttpClient())
+                {
+                    var response = await client.GetByteArrayAsync(downloadUrl);
+                // Use WriteAllBytes in .NET Framework
+                File.WriteAllBytes(tempZipPath, response);
+
+                }
+
+                // 2. Extract the zip file
+                if (Directory.Exists(extractFolderPath))
+                {
+                    Directory.Delete(extractFolderPath, true); // Remove any existing extraction folder
+                }
+
+                // Extract the downloaded zip file
+                using (FileStream fs = File.OpenRead(tempZipPath))
+                using (ZipInputStream zipStream = new ZipInputStream(fs))
+                {
+                    ZipEntry entry;
+                    while ((entry = zipStream.GetNextEntry()) != null)
+                    {
+                        string filePath = Path.Combine(extractFolderPath, entry.Name);
+                        Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+
+                        using (FileStream fileStream = File.Create(filePath))
+                        {
+                            await zipStream.CopyToAsync(fileStream);
+                        }
+                    }
+                }
+
+                // 3. Delete old files
+                string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
+                var oldFiles = Directory.GetFiles(appDirectory, "*", SearchOption.TopDirectoryOnly);
+
+                foreach (var oldFile in oldFiles)
+                {
+                    // Avoid deleting the updater file if it's running
+                    if (!oldFile.Equals(Assembly.GetExecutingAssembly().Location))
+                    {
+                        File.Delete(oldFile);
+                    }
+                }
+
+                // 4. Move new files to the application directory
+                var extractedFiles = Directory.GetFiles(extractFolderPath, "*", SearchOption.AllDirectories);
+
+                foreach (var extractedFile in extractedFiles)
+                {
+                    string destFile = Path.Combine(appDirectory, Path.GetFileName(extractedFile));
+
+                    // Move the file to the application directory
+                    File.Move(extractedFile, destFile);
+                }
+
+                // Optionally, run the updated executable
+                string updatedExePath = Path.Combine(appDirectory, "syphra.exe");
+                if (File.Exists(updatedExePath))
+                {
+                    Process.Start(updatedExePath);
+                }
+
+                // Optionally, close the current application
+                Application.Exit();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error during update: {ex.Message}", "Update Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        private string defPath = Application.StartupPath + "//Monaco//";
+
+        // This is your WebView2 control reference
+        private WebView2 webView211;
+
+
+
+
+        private async void Form2_LoadAsync(object sender, EventArgs e)
+        {
+            string userName = Environment.MachineName;
+            LoadKeyFile();
+
+            // Display a welcome message with the computer name
+            label12.Text = $"Welcome {userName}!";
+            await FetchScripts(1); // Set the form's rounded corners
+            this.Region = new Region(GetRoundedRectPath(this.ClientRectangle, CornerRadius));
+            await LoadDataAsync();
+            await LoadUpdatesFromRawUrlAsync();
+            await BanwaveNews();
+
+            homePanel.Visible = false;
+            homePage.Visible = false;
+
+            settingsPanel.Visible = false;
+            settingsPage.Visible = false;
+
+            serverPanel.Visible = false;
+            serversPage.Visible = false;
+
+            keyPanel.Visible = false;
+            keyPage.Visible = false;
+
+            startupPage.Visible = true;
+            startupPanel.Visible = true;
+            await CheckVersionOnceAsync();
+            await webView21.EnsureCoreWebView2Async();
+
+            // Handle registry settings for IE emulation mode (this part is optional)
+            try
+            {
+                var registryKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Internet Explorer\\Main\\FeatureControl\\FEATURE_BROWSER_EMULATION", true);
+                string friendlyName = AppDomain.CurrentDomain.FriendlyName;
+                if (registryKey.GetValue(friendlyName) == null)
+                {
+                    registryKey.SetValue(friendlyName, 11001, Microsoft.Win32.RegistryValueKind.DWord);
+                }
+            }
+            catch (Exception) { }
+
+            // Load Monaco HTML page into WebView2
+            webView21.CoreWebView2.Navigate($"file:///{Directory.GetCurrentDirectory()}/Monaco/Monaco.html");
+
+            // Wait a little for the WebView2 to initialize and load the content
+            await Task.Delay(500);
+                
+            // Execute JavaScript to set the theme and run further scripts
+            await webView21.CoreWebView2.ExecuteScriptAsync("SetTheme('Dark')");
+
+            // Call the functions to add intellisense
+            addBase();
+            addMath();
+            addGlobalNS();
+            addGlobalV();
+            addGlobalF();
+
+            // Set the initial text in the Monaco editor
+            await webView21.CoreWebView2.ExecuteScriptAsync("SetText('-- Syphra Softworks proudly made by @gigzaz')");
+        }
+
+
+        private void siticoneButton4_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
+        }
+
+        private void siticoneButton5_Click(object sender, EventArgs e)
+        {
+            this.WindowState = FormWindowState.Minimized;
+        }
+
+        private void siticonePanel1_Paint(object sender, PaintEventArgs e)
+        {
+        }
+
+        private void homePanel_Paint(object sender, PaintEventArgs e)
+        {
+        }
+
+        private void settingsPanel_Paint(object sender, PaintEventArgs e)
+        {
+        }
+
+        private void serverPanel_Paint(object sender, PaintEventArgs e)
+        {
+        }
+
+        private void keyPanel_Paint(object sender, PaintEventArgs e)
+        {
+        }
+
+        private void homePage_Paint(object sender, PaintEventArgs e)
+        {
+        }
+
+        private void homeButton_Click(object sender, EventArgs e)
+        {
+            // Show homePanel and homePage
+            homePanel.Visible = true;
+            homePage.Visible = true;
+
+            // Hide other panels and pages
+            settingsPanel.Visible = false;
+            settingsPage.Visible = false;
+
+            serverPanel.Visible = false;
+            serversPage.Visible = false;
+
+            keyPanel.Visible = false;
+            keyPage.Visible = false;
+
+            startupPage.Visible = false;
+            startupPanel.Visible = false;
+
+        }
+
+
+
+
+        private void serverButton_Click(object sender, EventArgs e)
+        {
+            // Show serverPanel and serverPage
+            serverPanel.Visible = true;
+            serversPage.Visible = true;
+
+            // Hide other panels and pages
+            homePanel.Visible = false;
+            homePage.Visible = false;
+
+            settingsPanel.Visible = false;
+            settingsPage.Visible = false;
+
+            keyPanel.Visible = false;
+            keyPage.Visible = false;
+            startupPage.Visible = false;
+            startupPanel.Visible = false;
+        }
+        private void keyButton_Click(object sender, EventArgs e)
+        {
+            // Show keyPanel and keyPage
+            keyPanel.Visible = true;
+            keyPage.Visible = true;
+
+            // Hide other panels and pages
+            homePanel.Visible = false;
+            homePage.Visible = false;
+
+            settingsPanel.Visible = false;
+            settingsPage.Visible = false;
+
+            serverPanel.Visible = false;
+            serversPage.Visible = false;
+            startupPage.Visible = false;
+            startupPanel.Visible = false;
+        }
+
+
+        private void settingsButton_Click(object sender, EventArgs e)
+        {
+            // Show settingsPanel and settingsPage
+            settingsPanel.Visible = true;
+            settingsPage.Visible = true;
+
+            // Hide other panels and pages
+            homePanel.Visible = false;
+            homePage.Visible = false;
+
+            serverPanel.Visible = false;
+            serversPage.Visible = false;
+
+            keyPanel.Visible = false;
+            keyPage.Visible = false;
+            startupPage.Visible = false;
+            startupPanel.Visible = false;
+        }
+
+
+        private void keyPage_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void serverPage_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void settingsPage_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void siticoneRadioButton1_CheckedChanged(object sender, EventArgs e)
+        {
+            // Check if the radio button is checked
+        }
+
+        private void reinstallrobloxButton_Click(object sender, EventArgs e)
+        {
+            // 1. Define paths or download links for Bloxstrap installer and installation path
+            string bloxstrapInstallerUrl = "https://github.com/bloxstraplabs/bloxstrap/releases/download/v2.8.5/Bloxstrap-v2.8.5.exe";
+
+            // Path to Bloxstrap in the AppData\Local folder for the current user
+            string bloxstrapInstallPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bloxstrap");
+            string installerPath = Path.Combine(Path.GetTempPath(), "Bloxstrap-v2.8.5.exe");
+
+            // 2. Uninstall the previous Bloxstrap installation (delete the old files)
+            UninstallBloxstrap(bloxstrapInstallPath);
+
+            // 3. Download and Install the new Bloxstrap version
+            InstallBloxstrap(bloxstrapInstallerUrl, installerPath);
+        }
+        private void UninstallBloxstrap(string installPath)
+        {
+            // Check if the Bloxstrap directory exists and clean up
+            if (Directory.Exists(installPath))
+            {
+                try
+                {
+                    // Delete the existing installation directory and all its contents
+                    Directory.Delete(installPath, true);
+                    MessageBox.Show("Previous Bloxstrap files have been removed.");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("An error occurred while cleaning up Bloxstrap: " + ex.Message);
+                }
+            }
+            else
+            {
+                MessageBox.Show("Bloxstrap is not installed.");
+            }
+        }
+        private void InstallBloxstrap(string installerUrl, string installerPath)
+        {
+            try
+            {
+                // Download the installer
+                using (var client = new WebClient())
+                {
+                    client.DownloadFile(installerUrl, installerPath);
+
+                    // Run the installer with elevated permissions (admin)
+                    ProcessStartInfo processStartInfo = new ProcessStartInfo(installerPath)
+                    {
+                        Verb = "runas", // This requests elevated (administrator) permissions
+                        UseShellExecute = true
+                    };
+                    Process.Start(processStartInfo);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("An error occurred while downloading or installing Bloxstrap: " + ex.Message);
+            }
+        }
+
+        private void deletetempButton_Click(object sender, EventArgs e)
+        {
+            // Define the system temp directories
+            string windowsTempPath = @"C:\Windows\Temp";
+            string userTempPath = System.IO.Path.GetTempPath();
+
+            try
+            {
+                // Delete files in Windows temp directory
+                DeleteFilesAndDirectories(windowsTempPath);
+
+                // Delete files in user temp directory
+                DeleteFilesAndDirectories(userTempPath);
+
+                MessageBox.Show("Temporary files deleted successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // Helper method to delete all files and directories in a given path
+        private void DeleteFilesAndDirectories(string path)
+        {
+            // Check if the directory exists
+            if (System.IO.Directory.Exists(path))
+            {
+                // Delete all files in the directory
+                foreach (string file in System.IO.Directory.GetFiles(path))
+                {
+                    try
+                    {
+                        System.IO.File.Delete(file);
+                    }
+                    catch { /* Optional: Log or handle individual file deletion errors */ }
+                }
+
+                // Delete all subdirectories and their contents
+                foreach (string directory in System.IO.Directory.GetDirectories(path))
+                {
+                    try
+                    {
+                        System.IO.Directory.Delete(directory, true); // true to delete all contents
+                    }
+                    catch { /* Optional: Log or handle individual directory deletion errors */ }
+                }
+            }
+        }
+
+        private void label12_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void pictureBox1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void listBoxScripts_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (!isPopulating && listBoxScripts.SelectedItem is Script selectedScript)
+            {
+                listBoxScripts.SelectedIndexChanged -= listBoxScripts_SelectedIndexChanged; // Unsubscribe to avoid multiple triggers
+
+                richTextBox1.Text = selectedScript.script;
+                try
+                {
+                    // Load the image from the URL
+                    string imageUrl = selectedScript.Game.ImageUrl;
+
+                    // Check if the URL is relative
+                    if (!Uri.IsWellFormedUriString(imageUrl, UriKind.Absolute))
+                    {
+                        // Prepend the base URL if it's a relative URL
+                        imageUrl = $"https://scriptblox.com{imageUrl}";
+                    }
+
+                    pictureBox1.Load(imageUrl);
+                }
+                catch (Exception ex)
+                {
+                    // Optionally, log the exception for debugging purposes
+                    Console.WriteLine($"Error loading image: {ex.Message}");
+
+                    // Handle error (e.g., show a default image or placeholder)
+                    pictureBox1.Image = Syphra.Properties.Resources.DefaultImage; // Replace 'DefaultImage' with your actual image name
+                                                                                          // Replace with your default image resource
+                }
+
+                listBoxScripts.SelectedIndexChanged += listBoxScripts_SelectedIndexChanged; // Re-subscribe
+            }
+        }
+
+        private void siticoneButton8_Click(object sender, EventArgs e)
+        {
+            SearchScripts(textBox1.Text);
+        }
+
+        private void bunifuFlatButton1_Click(object sender, EventArgs e)
+        {
+            Clipboard.SetText(richTextBox1.Text);
+        }
+        public class Game
+        {
+            public long GameId { get; set; }
+            public string Name { get; set; }
+            public string ImageUrl { get; set; }
+        }
+
+        public class Script
+        {
+            public string Id { get; set; } // Renamed from _id to Id for C# naming conventions
+            public string Title { get; set; }
+            public Game Game { get; set; }
+            public string script { get; set; } // This will be the 'script' property
+            public string Slug { get; set; }
+            public bool Verified { get; set; }
+            public bool Key { get; set; }
+            public string KeyLink { get; set; }
+            public int Views { get; set; }
+            public string ScriptType { get; set; }
+            public bool IsUniversal { get; set; }
+            public bool IsPatched { get; set; }
+            public string Visibility { get; set; }
+            public DateTime CreatedAt { get; set; }
+            public DateTime UpdatedAt { get; set; }
+            public int V { get; set; } // This is "__v"
+            public List<string> Matched { get; set; }
+        }
+
+        public class Result
+        {
+            public int TotalPages { get; set; }
+            public List<Script> Scripts { get; set; }
+        }
+
+        public class ApiResponse
+        {
+            public Result Result { get; set; }
+        }
+
+        private void serversPage_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            System.Diagnostics.Process.Start("https://scriptblox.com");
+        }
+
+        private void richTextBox1_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+
+        private void Form2_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            
+        }
+
+        private void injectStatus_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void startupButton_Click(object sender, EventArgs e)
+        {
+            settingsPanel.Visible = false;
+            settingsPage.Visible = false;
+
+            // Hide other panels and pages
+            homePanel.Visible = false;
+            homePage.Visible = false;
+
+            serverPanel.Visible = false;
+            serversPage.Visible = false;
+
+            keyPanel.Visible = false;
+            keyPage.Visible = false;
+            startupPage.Visible = true;
+            startupPanel.Visible = true;
+        }
+
+        private void updatesShow_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void updatesPanel_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+
+        private async void refreshUpdate_Click(object sender, EventArgs e)
+        {
+            await LoadUpdatesFromRawUrlAsync();
+            await BanwaveNews();
+        }
+        private async Task LoadUpdatesFromRawUrlAsync()
+        {
+            // URL of the raw file on GitHub
+            string rawUrl = "https://raw.githubusercontent.com/emac3399son/SyphraUpdates/refs/heads/main/updates.txt";
+
+            try
+            {
+                // Use HttpClient to fetch the raw file content
+                using (HttpClient client = new HttpClient())
+                {
+                    // Download the content as a string
+                    string rawContent = await client.GetStringAsync(rawUrl);
+
+                    // Save the downloaded content to a file in the same directory as the EXE
+                    File.WriteAllText(filePath, rawContent);
+
+                    // Display the content from the file in the TextBox
+                    updatesTextBox.Text = rawContent;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle any errors that might occur while downloading the file
+                MessageBox.Show("Error loading updates: " + ex.Message);
+            }
+        }
+        private async Task BanwaveNews()
+        {
+            // URL of the raw file on GitHub
+            string rawUrl = "https://raw.githubusercontent.com/emac3399son/SyphraUpdates/refs/heads/main/banwaves.txt";
+
+            try
+            {
+                // Use HttpClient to fetch the raw file content
+                using (HttpClient client = new HttpClient())
+                {
+                    // Download the content as a string
+                    string rawContent = await client.GetStringAsync(rawUrl);
+
+                    // Save the downloaded content to a file in the same directory as the EXE
+                    File.WriteAllText(filePath, rawContent);
+
+                    // Display the content from the file in the TextBox
+                    banwaveTextBox.Text = rawContent;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle any errors that might occur while downloading the file
+                MessageBox.Show("Error loading updates: " + ex.Message);
+            }
+        }
+
+        private void siticoneToggleSwitch1_CheckedChanged(object sender, EventArgs e)
+        {
+            if (siticoneToggleSwitch1.Checked)
+            {
+                // Set form to always be on top
+                this.TopMost = true;
+            }
+            else
+            {
+                // Set form to behave normally (not always on top)
+                this.TopMost = false;
+            }
+        }
+
+        private void banwaveTextBox_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void label12_Click_1(object sender, EventArgs e)
+        {
+            string userName = Environment.MachineName;
+            MessageBox.Show($"Welcome {userName}!");
+        }
+
+        private void richTextBox4_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void siticoneButton10_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start("https://discord.gg/vPj8kuUs85");
+        }
+
+        private void siticoneButton1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void siticoneButton2_Click(object sender, EventArgs e)
+        {
+            webView21.CoreWebView2.ExecuteScriptAsync("SetText('')");
+        }
+
+        private void siticoneButton3_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void siticoneButton6_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private async void siticoneButton6_Click_1(object sender, EventArgs e)
+        {
+            using (SaveFileDialog saveFileDialog = new SaveFileDialog())
+            {
+                saveFileDialog.Filter = "Text Files (*.txt)|*.txt|Rich Text Files (*.rtf)|*.rtf|All Files (*.*)|*.*";
+                saveFileDialog.Title = "Save a File";
+
+                if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    string filePath = saveFileDialog.FileName;
+
+                    // Check if it's a .rtf or .txt file extension
+                    if (Path.GetExtension(filePath).ToLower() == ".rtf")
+                    {
+                        // Get Monaco content (if Monaco supports plain text)
+                        string content = await GetMonacoEditorContentAsync();
+                        File.WriteAllText(filePath, content); // Save plain text, even for .rtf extension
+                    }
+                    else
+                    {
+                        // Save Monaco editor content as .txt
+                        string content = await GetMonacoEditorContentAsync();
+                        File.WriteAllText(filePath, content);
+                    }
+                }
+            }
+        }
+
+        // Open File Button (Similar to Open File in SiticoneTextBox)
+        private async void siticoneButton3_Click_1(object sender, EventArgs e)
+        {
+            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            {
+                openFileDialog.Filter = "Text Files (*.txt)|*.txt|Rich Text Files (*.rtf)|*.rtf|All Files (*.*)|*.*";
+                openFileDialog.Title = "Open a File";
+
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    string filePath = openFileDialog.FileName;
+
+                    // Read content from the file
+                    string fileContent = File.ReadAllText(filePath);
+
+                    // Load the content into Monaco editor inside WebView2
+                    await SetMonacoEditorContentAsync(fileContent);
+                }
+            }
+        }
+
+        private async void ExecuteScriptAndSend()
+        {
+            // Execute JavaScript to get content from Monaco editor
+            string scriptName = "GetText"; // The JavaScript function name
+            string script = await ExecuteJavaScriptAsync(scriptName);
+
+            // Call your custom API to send the script (you can replace this with your actual function)
+            await API.SendScript(script);
+        }
+
+        // Method to execute JavaScript inside WebView2 and return the result as a string
+        private async Task<string> ExecuteJavaScriptAsync(string scriptName)
+        {
+            // Use ExecuteScriptAsync to run JavaScript in WebView2
+            string script = $"return {scriptName}();"; // Ensure the function name matches the JavaScript function in Monaco
+            string result = await webView21.CoreWebView2.ExecuteScriptAsync(script);
+
+            // Clean up the result (e.g., trim quotes from string response)
+            return result.Trim('"'); // Remove the surrounding quotes (if any)
+        }
+
+        // Clear Monaco editor content
+        private  void siticoneButton2_Click_1(object sender, EventArgs e)
+        {
+            // Clear Monaco content
+            webView21.CoreWebView2.ExecuteScriptAsync("SetText('')");
+        }
+
+        // Send script from Monaco editor (you can replace this with your custom logic)
+        private async void siticoneButton1_Click_1(object sender, EventArgs e)
+        {
+            string script = await GetMonacoEditorContentAsync();
+            await API.SendScript(script); // Assuming this is your API logic for sending the script
+        }
+
+        // Method to get the content from Monaco Editor inside WebView2
+        private async Task<string> GetMonacoEditorContentAsync()
+        {
+            if (webView21.CoreWebView2 == null)
+            {
+                throw new InvalidOperationException("CoreWebView2 is not initialized.");
+            }
+
+            string script = "return monaco.editor.getModels()[0].getValue();"; // Adjust if needed
+            try
+            {
+                string result = await webView21.CoreWebView2.ExecuteScriptAsync(script);
+                return JsonConvert.DeserializeObject<string>(result); // Properly handle JSON-encoded result
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Failed to retrieve Monaco Editor content.", ex);
+            }
+        }
+
+
+        // Method to set the content in Monaco Editor inside WebView2
+        private async Task SetMonacoEditorContentAsync(string content)
+        {
+            // Execute JavaScript to set Monaco content
+            string script = $"monaco.editor.getModels()[0].setValue({content});"; // Adjust JS code as necessary
+            await webView21.CoreWebView2.ExecuteScriptAsync(script);
+        }
+
+        private void siticoneButton7_Click_1(object sender, EventArgs e)
+        {
+            API.Attach();
+        }
+
+
+        private void siticoneButton9_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start("https://discord.gg/ApFZFGuYxh");
+        }
+
+        private void settingsPage_Paint_1(object sender, PaintEventArgs e)
+        {
+
+        }
+
+
+        private async void siticoneButton11_Click(object sender, EventArgs e)
+        {
+            await API.SendScript("loadstring(game:HttpGet(\"https://gitlab.com/sens3/nebunu/-/raw/main/HummingBird8's_sUNC_yes_i_moved_to_gitlab_because_my_github_acc_got_brickedd/sUNCm0m3n7.lua\"))()");
+        }
+
+        private void siticoneToggleSwitch2_CheckedChanged(object sender, EventArgs e)
+        {
+            if (siticoneToggleSwitch2.Checked)
+            {
+                API.SetAutoInject(true); // On
+            }
+            else
+            {
+                API.SetAutoInject(false); // Off
+            }
+        }
+
+
+        private void siticonePanel5_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void label17_Click(object sender, EventArgs e)
+        {
+
+        }
+
+
+        private void textBox1_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void siticoneGradientPanel2_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void serversPage_Paint_1(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void label17_Click_1(object sender, EventArgs e)
+        {
+
+        }
+
+        private void pictureBox2_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void siticoneButton12_Click(object sender, EventArgs e)
+        {
+            Form1 form1 = new Form1();
+            form1.Show();
+        }
+
+        private void webView21_Click(object sender, EventArgs e)
+        {
+
+        }
+    }
+}
