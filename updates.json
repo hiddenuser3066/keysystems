@@ -1,0 +1,67 @@
+[
+  {
+    "version": "1.0.5",
+    "date": "12/30/2024 9:25 PM",
+    "whats_new": [
+      "Updated ArcadiaAPI to 2.0",
+      "Added Reinstall Bloxstrap button to prevent from being logged by Roblox",
+      "Fixed Clear Temporary files button",
+      "Fixed minor UI bugs"
+    ]
+  },
+  {
+    "version": "1.0.6 (Pre-release)",
+    "date": "12/31/2024 1:28 AM",
+    "whats_new": [
+      "Fixed Obfuscation bugs allowing users to get source",
+      "Version fetching & checking (checks if your Syphra version is the latest)",
+      "Themes (only 1 for now; for beta, more coming soon)",
+      "Added Credits page (shows who contributed to the project)",
+      "Auto Attach (settings option)",
+      "Single file executable (no more goofy DLLs)"
+    ]
+  },
+  {
+    "version": "1.0.6",
+    "date": "12/31/2024 5:39 PM",
+    "whats_new": [
+      "Fixed Obfuscation bugs allowing users to get source",
+      "Version fetching & checking (checks if your Syphra version is the latest)",
+      "Added Themes (only 1 for now; for beta, more coming soon)",
+      "Added Credits page (shows who contributed to the project)",
+      "Auto Attach (settings option)",
+      "Single file executable (no more goofy DLLs)",
+      "Removed notification popups causing issues with task manager"
+    ]
+  },
+  {
+    "version": "1.0.7",
+    "date": "1/3/2025 3:06 AM",
+    "whats_new": [
+      "API updated",
+      "No more crashes upon injection",
+      "Monaco added"
+    ],
+    "credits": "Syphra made by @𝔙𝔞𝔩𝔡𝔬𝔯𝔞𝔱𝔬𝔯𝔷"
+  },
+  {
+    "version": "1.0.8",
+    "date": "1/6/2025 11:14 PM",
+    "whats_new": [
+      "API updated",
+      "Auto Attach enabled",
+      "Monaco fixed for small people"
+    ],
+    "wait_on": "When Syphra prompts for an update, you press 'Yes,' but it doesn't update. Will be fixed in the future."
+  },
+  {
+    "version": "1.1.0",
+    "date": "1/8/2025 4:50 PM",
+    "whats_new": [
+      "API Updated to v3",
+      "Monaco fixed for small people",
+      "Added Tabs",
+      "Fixed Update button to update Syphra automatically"
+    ]
+  }
+]
